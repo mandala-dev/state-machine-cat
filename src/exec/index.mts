@@ -3,12 +3,12 @@ import type {
     IState
 } from "../../types/state-machine-cat.d.mts";
 
-interface IStateWithParent extends IState {
+export interface IStateWithParent extends IState {
     parent: IExeStateMachine
 }
 
 // Executable state machine
-interface IExeStateMachine extends IStateMachine {
+export interface IExeStateMachine extends IStateMachine {
     parent: IExeStateMachine
     curstate: IStateWithParent
 }
