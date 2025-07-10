@@ -4,12 +4,11 @@ import type {
 } from "../../types/state-machine-cat.d.mts";
 
 export interface IStateWithParent extends IState {
-    parent: IExeStateMachine
+    parent: IStateWithParent | null;
 }
 
 // Executable state machine
 export interface IExeStateMachine extends IStateMachine {
-    parent: IExeStateMachine
     curstate: IStateWithParent
 }
 
@@ -57,17 +56,35 @@ export function startStateMachine(sm: IExeStateMachine): void {
         }
     }
     // This shouldn't happen on a properly defined statechart
+    console.log("WARNING: current state is null.");
     sm.curstate = null
 }
 
 // TODO: more efficient transitioning based on hash-mapped states etc.
-export function fireEvent(sm: IExeStateMachine, event: string) : void {
-    const parentSm = sm.curstate.parent.parent
-    if (!parentSm.transitions)
-        return
-    for (let i = 0; i < parentSm.transitions.length; ++i) {
-        if (parentSm.transitions[i].event == event && parentSm.transitions[i].from == sm.curstate.name) {
-            sm.curstate = findStateDeep(parentSm, parentSm.transitions[i].to) as IStateWithParent || sm.curstate
+export function fireEvent(sm: IExeStateMachine, event: string): void {
+    const parentState = sm.curstate.parent;
+    if (!parentState)
+        return;
+    if (!parentState.statemachine)
+        return;
+    if (parentState.statemachine.transitions) {
+        for (let i = 0; i < parentState.statemachine.transitions.length; ++i) {
+            const transition = parentState.statemachine.transitions[i];
+            if (transition.event == event && transition.from == sm.curstate.name) {
+                sm.curstate = findStateDeep(parentState.statemachine, transition.to) as IStateWithParent || sm.curstate;
+            }
+        }
+    }
+}
+
+export let root: IStateWithParent = { name: 'root', parent: null, type: 'regular' };
+
+export function addParents(sm: IExeStateMachine, parent: IStateWithParent): void {
+    for (let i = 0; i < sm.states.length; ++i) {
+        const state = sm.states[i] as IStateWithParent;
+        state.parent = parent;
+        if (state['statemachine'] != undefined) {
+            addParents(state.statemachine as IExeStateMachine, state);
         }
     }
 }
