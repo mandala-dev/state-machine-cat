@@ -5,11 +5,12 @@ import type {
 
 export interface IStateWithParent extends IState {
     parent: IStateWithParent | null;
+    statemachine?: IExeStateMachine;
 }
 
 // Executable state machine
 export interface IExeStateMachine extends IStateMachine {
-    curstate: IStateWithParent
+    curstate: IStateWithParent | null;
 }
 
 // Deliberately using state-machine-cat interfaces, cast downstream if needed
@@ -32,8 +33,9 @@ export function findStateDeep(sm: IStateMachine, stateName: string): IState | nu
     }
     // Try to find in children of child states
     for (let j = 0; j < sm.states.length; ++j) {
-        if (sm.states[j].hasOwnProperty('statemachine')) {
-            const foundState = findStateDeep(sm.states[j].statemachine, stateName)
+        const state = sm.states[j];
+        if (state.statemachine) {
+            const foundState = findStateDeep(state.statemachine, stateName)
             if (foundState)
                 return foundState
         }
@@ -62,11 +64,12 @@ export function startStateMachine(sm: IExeStateMachine): void {
 
 // TODO: more efficient transitioning based on hash-mapped states etc.
 export function fireEvent(sm: IExeStateMachine, event: string): void {
+    if (!sm.curstate)
+        return;
     const parentState = sm.curstate.parent;
-    if (!parentState)
+    if (!parentState || !parentState.statemachine)
         return;
-    if (!parentState.statemachine)
-        return;
+    
     if (parentState.statemachine.transitions) {
         for (let i = 0; i < parentState.statemachine.transitions.length; ++i) {
             const transition = parentState.statemachine.transitions[i];
@@ -77,7 +80,7 @@ export function fireEvent(sm: IExeStateMachine, event: string): void {
     }
 }
 
-export let root: IStateWithParent = { name: 'root', parent: null, type: 'regular' };
+export let root: IStateWithParent = { name: 'root', parent: null, type: 'regular'};
 
 export function addParents(sm: IExeStateMachine, parent: IStateWithParent): void {
     for (let i = 0; i < sm.states.length; ++i) {
