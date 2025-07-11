@@ -58,8 +58,12 @@ export function startStateMachine(sm: IExeStateMachine): void {
         }
     }
     // This shouldn't happen on a properly defined statechart
-    console.log("WARNING: current state is null.");
-    sm.curstate = null
+    console.log("WARNING: initial state not specified, proclaiming the first state as initial.");
+    //console.log(sm);
+    if (sm.states[0])
+        sm.curstate = sm.states[0] as IStateWithParent;
+    else
+        sm.curstate = null;
 }
 
 // TODO: more efficient transitioning based on hash-mapped states etc.
