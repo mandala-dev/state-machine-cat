@@ -67,20 +67,61 @@ export function startStateMachine(sm: IExeStateMachine): void {
 }
 
 // TODO: more efficient transitioning based on hash-mapped states etc.
+function findTransitionRecursive(sm: IExeStateMachine, event: string, fromState: string): any {
+    // Look for transitions in current state machine
+    if (sm.transitions) {
+        for (let i = 0; i < sm.transitions.length; ++i) {
+            const transition = sm.transitions[i];
+            if (transition.event == event && transition.from == fromState) {
+                return transition;
+            }
+        }
+    }
+    return null;
+}
+
+function findTransitionInHierarchy(currentState: IStateWithParent, event: string): any {
+    // Collect all ancestor state names
+    let stateNames = [currentState.name];
+    let ancestor = currentState.parent;
+    while (ancestor && ancestor.name !== 'root') {
+        stateNames.push(ancestor.name);
+        ancestor = ancestor.parent;
+    }
+    
+    let parent = currentState.parent;
+    while (parent && parent.statemachine) {
+        // Try transitions from all possible ancestor state names
+        for (let stateName of stateNames) {
+            let transition = findTransitionRecursive(parent.statemachine as IExeStateMachine, event, stateName);
+            if (transition) {
+                return { transition, stateMachine: parent.statemachine };
+            }
+        }
+        
+        parent = parent.parent;
+    }
+    return null;
+}
+
 export function fireEvent(sm: IExeStateMachine, event: string): void {
     if (!sm.curstate)
         return;
-    const parentState = sm.curstate.parent;
-    if (!parentState || !parentState.statemachine)
-        return;
     
-    if (parentState.statemachine.transitions) {
-        for (let i = 0; i < parentState.statemachine.transitions.length; ++i) {
-            const transition = parentState.statemachine.transitions[i];
-            if (transition.event == event && transition.from == sm.curstate.name) {
-                sm.curstate = findStateDeep(parentState.statemachine, transition.to) as IStateWithParent || sm.curstate;
-            }
+    // First try finding transition in the current state's parent
+    const parentState = sm.curstate.parent;
+    if (parentState && parentState.statemachine) {
+        const transition = findTransitionRecursive(parentState.statemachine as IExeStateMachine, event, sm.curstate.name);
+        if (transition) {
+            sm.curstate = findStateDeep(parentState.statemachine, transition.to) as IStateWithParent || sm.curstate;
+            return;
         }
+    }
+    
+    // If not found, search up the hierarchy
+    const result = findTransitionInHierarchy(sm.curstate, event);
+    if (result) {
+        sm.curstate = findStateDeep(result.stateMachine, result.transition.to) as IStateWithParent || sm.curstate;
     }
 }
 
